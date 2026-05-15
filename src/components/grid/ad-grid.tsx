@@ -213,15 +213,9 @@ export function AdGrid({
             />
           ))}
           {selectedSquares.length > 1 && (
-            <div
-              className="absolute z-40 border-2 border-dashed border-green-700"
-              style={{
-                left: `${(selectionBounds.x / BOARD_SIZE) * 100}%`,
-                top: `${(selectionBounds.y / BOARD_SIZE) * 100}%`,
-                width: `${(selectionBounds.width / BOARD_SIZE) * 100}%`,
-                height: `${(selectionBounds.height / BOARD_SIZE) * 100}%`,
-              }}
-            />
+            <span className="sr-only">
+              Selected cell set spans {selectionBounds.width} by {selectionBounds.height} board units.
+            </span>
           )}
         </div>
 
@@ -233,15 +227,18 @@ export function AdGrid({
           }
         >
           <div className="relative aspect-square bg-amber-50">
-            <span
-              className="absolute block bg-green-400"
-              style={{
-                left: `${(selectionBounds.x / BOARD_SIZE) * 100}%`,
-                top: `${(selectionBounds.y / BOARD_SIZE) * 100}%`,
-                width: `${Math.max((selectionBounds.width / BOARD_SIZE) * 100, 3)}%`,
-                height: `${Math.max((selectionBounds.height / BOARD_SIZE) * 100, 3)}%`,
-              }}
-            />
+            {selectedSquares.map((square) => (
+              <span
+                className="absolute block bg-green-400"
+                key={getSquareKey(square)}
+                style={{
+                  left: `${(square.x / BOARD_SIZE) * 100}%`,
+                  top: `${(square.y / BOARD_SIZE) * 100}%`,
+                  width: `${Math.max((square.size / BOARD_SIZE) * 100, 2)}%`,
+                  height: `${Math.max((square.size / BOARD_SIZE) * 100, 2)}%`,
+                }}
+              />
+            ))}
           </div>
           <p
             className={

@@ -65,13 +65,13 @@ export function getCreativeGuidance(rect: PlotRect) {
   ];
 
   if (isTiny) {
-    suggestions.unshift("This is a tiny placement. Use an icon, logo mark, or buy a larger rectangle for text.");
+    suggestions.unshift("This is a tiny coordinate set. Use an icon, logo mark, or select more cells for text.");
   } else if (isBanner) {
-    suggestions.unshift("This banner shape is good for a logo plus a short phrase.");
+    suggestions.unshift("This wide coordinate set is good for a logo plus a short phrase.");
   } else if (isTower) {
-    suggestions.unshift("This tall shape is best for a mascot, product shot, or stacked logo.");
+    suggestions.unshift("This tall coordinate set is best for a mascot, product shot, or stacked logo.");
   } else {
-    suggestions.unshift("This shape can support a logo, short headline, and simple background.");
+    suggestions.unshift("This coordinate set can support a logo, short headline, and simple background.");
   }
 
   return {

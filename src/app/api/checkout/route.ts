@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { BOOST_HOURS, RESERVATION_TTL_MINUTES, TOTAL_UNITS } from "@/lib/board/constants";
-import { clampRect, getSquaresUnitCount } from "@/lib/board/geometry";
+import { getSquaresUnitCount } from "@/lib/board/geometry";
 import { quoteUnits } from "@/lib/board/pricing";
 import { createNowPaymentsInvoice } from "@/lib/nowpayments";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
@@ -29,7 +29,6 @@ export async function POST(request: Request) {
   }
 
   try {
-    const selection = clampRect(parsed.data.selection);
     const supabase = getSupabaseAdmin();
 
     const { data: stats, error: statsError } = await supabase.rpc("get_board_stats").single();
@@ -74,7 +73,7 @@ export async function POST(request: Request) {
     const invoice = await createNowPaymentsInvoice({
       orderId,
       amountUsd: quote.subtotalCents / 100,
-      description: `${selection.width}x${selection.height} plot on Billion Dollar Vig`,
+      description: `${parsed.data.squares.length} coordinate cell purchase on Billion Dollar Vig`,
     });
 
     const { error: paymentError } = await supabase

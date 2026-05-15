@@ -1,12 +1,6 @@
 import { z } from "zod";
 
 export const checkoutRequestSchema = z.object({
-  selection: z.object({
-    x: z.number().int().min(0).max(999),
-    y: z.number().int().min(0).max(999),
-    width: z.number().int().min(1).max(1000),
-    height: z.number().int().min(1).max(1000),
-  }),
   squares: z
     .array(
       z.object({

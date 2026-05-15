@@ -10,7 +10,6 @@ import { SELECTABLE_SQUARE_SIZE, TOTAL_UNITS } from "@/lib/board/constants";
 import {
   getSquaresBounds,
   getSquaresUnitCount,
-  isContiguousSquareSelection,
   snapPointToSquare,
   toggleSquare,
   type PurchaseSquare,
@@ -54,10 +53,6 @@ export function BoardExperience({ blocks, stats, checkoutConfigured }: BoardExpe
   );
   const soldPercent = ((stats.soldUnits / TOTAL_UNITS) * 100).toFixed(3);
   const selectionBounds = useMemo(() => getSquaresBounds(selectedSquares), [selectedSquares]);
-  const isContiguous = useMemo(
-    () => isContiguousSquareSelection(selectedSquares),
-    [selectedSquares],
-  );
 
   function centerSelectionFromPoint(x: number, y: number) {
     const square = snapPointToSquare(x, y);
@@ -118,17 +113,17 @@ export function BoardExperience({ blocks, stats, checkoutConfigured }: BoardExpe
             onClick={() => setBuyOpen(false)}
             type="button"
           />
-          <aside className="pixel-panel absolute bottom-0 right-0 top-auto max-h-[92vh] w-full overflow-y-auto rounded-t-3xl p-4 text-amber-50 shadow-2xl md:bottom-4 md:right-4 md:top-4 md:max-h-none md:w-[440px] md:rounded-3xl">
+          <aside className="absolute bottom-0 right-0 top-auto max-h-[92vh] w-full overflow-y-auto rounded-t-3xl border-2 border-[#d7a83f] bg-black p-4 text-[#f8edc7] shadow-[0_0_80px_rgba(215,168,63,0.25)] md:bottom-4 md:right-4 md:top-4 md:max-h-none md:w-[440px] md:rounded-3xl">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <p className="font-mono text-xs uppercase tracking-[0.25em] text-green-200">
+                <p className="font-mono text-xs uppercase tracking-[0.25em] text-[#d7a83f]">
                   Buy squares
                 </p>
-                <h2 className="text-2xl font-black">Select squares, upload art, pay</h2>
+                <h2 className="text-2xl font-black text-[#fff7dc]">Select cells, upload art, pay</h2>
               </div>
               <button
                 aria-label="Close buy panel"
-                className="rounded-full border border-amber-200/30 p-2 text-amber-50"
+                className="rounded-full border border-[#d7a83f]/60 bg-[#160f04] p-2 text-[#f5d37c] transition hover:bg-[#2b1c05]"
                 onClick={() => setBuyOpen(false)}
                 type="button"
               >
@@ -136,43 +131,40 @@ export function BoardExperience({ blocks, stats, checkoutConfigured }: BoardExpe
               </button>
             </div>
 
-            <div className="mb-4 rounded-2xl border border-amber-200/20 bg-black/25 p-3">
+            <div className="mb-4 rounded-2xl border border-[#d7a83f]/40 bg-[#0b0905] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
               <div className="mb-3 flex flex-wrap items-center gap-2">
-                <span className="font-mono text-xs uppercase tracking-[0.2em] text-amber-200/80">
-                  Selected squares
+                <span className="font-mono text-xs uppercase tracking-[0.2em] text-[#f5d37c]">
+                  Selected cells
                 </span>
-                <span className="rounded-full border border-green-200/30 bg-green-200/10 px-3 py-1 text-sm text-green-100">
+                <span className="rounded-full border border-[#d7a83f]/50 bg-[#d7a83f]/15 px-3 py-1 text-sm text-[#fff1b8]">
                   {selectedSquares.length} selected
                 </span>
                 <button
-                  className="rounded-full border border-amber-300/30 px-3 py-1 text-sm text-amber-50 transition hover:border-amber-200 hover:bg-amber-200/10"
+                  className="rounded-full border border-[#d7a83f]/40 px-3 py-1 text-sm text-[#f8edc7] transition hover:border-[#f5d37c] hover:bg-[#d7a83f]/10"
                   onClick={() => setSelectedSquares([DEFAULT_SQUARE])}
                   type="button"
                 >
                   Reset
                 </button>
               </div>
-              <p className="text-sm text-amber-100/70">
-                Click board squares to toggle them on or off. Upload one connected artwork
-                for the selected shape; each purchased square shows its part of that artwork.
+              <p className="text-sm text-[#f8edc7]/70">
+                Click individual 10x10 cells on the board to toggle exact coordinates.
+                Your selected cells can form any shape; empty holes remain empty.
               </p>
-              {!isContiguous && (
-                <p className="mt-2 rounded-xl border border-red-300/30 bg-red-500/10 p-2 text-xs text-red-100">
-                  These squares are not connected. You can still price them, but connected
-                  artwork works best when every selected square touches another selected square.
-                </p>
-              )}
             </div>
 
             <div className="space-y-4">
-              <CreativeBuilder creative={creative} onChange={setCreative} selection={selectionBounds} />
+              <CreativeBuilder
+                creative={creative}
+                onChange={setCreative}
+                selectedSquares={selectedSquares}
+                selection={selectionBounds}
+              />
               <PurchasePanel
                 checkoutConfigured={checkoutConfigured}
                 creative={creative}
-                isContiguous={isContiguous}
                 quote={quote}
                 selectedSquares={selectedSquares}
-                selection={selectionBounds}
               />
             </div>
           </aside>
