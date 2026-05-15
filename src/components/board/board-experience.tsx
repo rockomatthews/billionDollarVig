@@ -6,8 +6,15 @@ import Image from "next/image";
 import { AdGrid } from "@/components/grid/ad-grid";
 import { CreativeBuilder, type CreativeDraft } from "@/components/creative/creative-builder";
 import { PurchasePanel } from "@/components/checkout/purchase-panel";
-import { BOARD_SIZE, TOTAL_UNITS } from "@/lib/board/constants";
-import { clampRect, getUnitCount, type PlotRect } from "@/lib/board/geometry";
+import { SELECTABLE_SQUARE_SIZE, TOTAL_UNITS } from "@/lib/board/constants";
+import {
+  getSquaresBounds,
+  getSquaresUnitCount,
+  isContiguousSquareSelection,
+  snapPointToSquare,
+  toggleSquare,
+  type PurchaseSquare,
+} from "@/lib/board/geometry";
 import { formatUsd, quoteUnits } from "@/lib/board/pricing";
 import type { AdBlock, BoardStats } from "@/lib/board/types";
 import logo from "../../../billionDollarVigLogo.png";
@@ -15,18 +22,18 @@ import logo from "../../../billionDollarVigLogo.png";
 type BoardExperienceProps = {
   blocks: AdBlock[];
   stats: BoardStats;
+  checkoutConfigured: boolean;
 };
 
-const DEFAULT_SELECTION: PlotRect = {
+const DEFAULT_SQUARE: PurchaseSquare = {
   x: 120,
   y: 160,
-  width: 10,
-  height: 10,
+  size: SELECTABLE_SQUARE_SIZE,
 };
 
-export function BoardExperience({ blocks, stats }: BoardExperienceProps) {
+export function BoardExperience({ blocks, stats, checkoutConfigured }: BoardExperienceProps) {
   const [buyOpen, setBuyOpen] = useState(false);
-  const [selection, setSelection] = useState<PlotRect>(DEFAULT_SELECTION);
+  const [selectedSquares, setSelectedSquares] = useState<PurchaseSquare[]>([DEFAULT_SQUARE]);
   const [creative, setCreative] = useState<CreativeDraft>({
     buyerLabel: "",
     targetUrl: "",
@@ -38,31 +45,30 @@ export function BoardExperience({ blocks, stats }: BoardExperienceProps) {
   });
 
   const quote = useMemo(
-    () => quoteUnits(stats.soldUnits + stats.reservedUnits, getUnitCount(selection)),
-    [selection, stats.reservedUnits, stats.soldUnits],
+    () => quoteUnits(stats.soldUnits + stats.reservedUnits, getSquaresUnitCount(selectedSquares)),
+    [selectedSquares, stats.reservedUnits, stats.soldUnits],
   );
   const nextTenByTenQuote = useMemo(
     () => quoteUnits(stats.soldUnits + stats.reservedUnits, 100),
     [stats.reservedUnits, stats.soldUnits],
   );
   const soldPercent = ((stats.soldUnits / TOTAL_UNITS) * 100).toFixed(3);
-
-  function moveSelection(next: Partial<PlotRect>) {
-    setSelection((current) => clampRect({ ...current, ...next }));
-  }
+  const selectionBounds = useMemo(() => getSquaresBounds(selectedSquares), [selectedSquares]);
+  const isContiguous = useMemo(
+    () => isContiguousSquareSelection(selectedSquares),
+    [selectedSquares],
+  );
 
   function centerSelectionFromPoint(x: number, y: number) {
-    setSelection((current) =>
-      clampRect({
-        ...current,
-        x: Math.round(x - current.width / 2),
-        y: Math.round(y - current.height / 2),
-      }),
-    );
+    const square = snapPointToSquare(x, y);
+    setSelectedSquares((current) => {
+      const next = toggleSquare(current, square);
+      return next.length === 0 ? [square] : next;
+    });
   }
 
   return (
-    <section className="flex h-screen flex-col overflow-hidden bg-[#f7e7b1] text-black">
+    <section className="flex h-screen flex-col overflow-hidden bg-black text-black">
       <header className="z-40 border-b-2 border-[#d7a83f] bg-black px-2 py-1 font-[Arial] shadow-[0_2px_0_#4f360c] md:px-3">
         <div className="flex min-h-14 items-center gap-2">
           <div className="min-w-0 flex-1">
@@ -94,10 +100,11 @@ export function BoardExperience({ blocks, stats }: BoardExperienceProps) {
         </div>
       </header>
 
-      <div className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1 bg-black">
         <AdGrid
           blocks={blocks}
-          selection={selection}
+          selectionBounds={selectionBounds}
+          selectedSquares={selectedSquares}
           onSelectPoint={centerSelectionFromPoint}
           fullScreen
         />
@@ -117,7 +124,7 @@ export function BoardExperience({ blocks, stats }: BoardExperienceProps) {
                 <p className="font-mono text-xs uppercase tracking-[0.25em] text-green-200">
                   Buy squares
                 </p>
-                <h2 className="text-2xl font-black">Select, upload, pay</h2>
+                <h2 className="text-2xl font-black">Select squares, upload art, pay</h2>
               </div>
               <button
                 aria-label="Close buy panel"
@@ -132,48 +139,41 @@ export function BoardExperience({ blocks, stats }: BoardExperienceProps) {
             <div className="mb-4 rounded-2xl border border-amber-200/20 bg-black/25 p-3">
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs uppercase tracking-[0.2em] text-amber-200/80">
-                  Plot size
+                  Selected squares
                 </span>
-                {[1, 3, 10, 25, 50].map((size) => (
-                  <button
-                    key={size}
-                    className="rounded-full border border-amber-300/30 px-3 py-1 text-sm text-amber-50 transition hover:border-amber-200 hover:bg-amber-200/10"
-                    onClick={() => moveSelection({ width: size, height: size })}
-                    type="button"
-                  >
-                    {size}x{size}
-                  </button>
-                ))}
+                <span className="rounded-full border border-green-200/30 bg-green-200/10 px-3 py-1 text-sm text-green-100">
+                  {selectedSquares.length} selected
+                </span>
+                <button
+                  className="rounded-full border border-amber-300/30 px-3 py-1 text-sm text-amber-50 transition hover:border-amber-200 hover:bg-amber-200/10"
+                  onClick={() => setSelectedSquares([DEFAULT_SQUARE])}
+                  type="button"
+                >
+                  Reset
+                </button>
               </div>
-              <div className="flex gap-3">
-                <label className="flex flex-1 items-center gap-2 text-sm text-amber-100/80">
-                  W
-                  <input
-                    className="min-w-0 flex-1 rounded-md border border-amber-200/20 bg-black/40 px-2 py-1 text-amber-50"
-                    min={1}
-                    max={BOARD_SIZE}
-                    onChange={(event) => moveSelection({ width: Number(event.target.value) })}
-                    type="number"
-                    value={selection.width}
-                  />
-                </label>
-                <label className="flex flex-1 items-center gap-2 text-sm text-amber-100/80">
-                  H
-                  <input
-                    className="min-w-0 flex-1 rounded-md border border-amber-200/20 bg-black/40 px-2 py-1 text-amber-50"
-                    min={1}
-                    max={BOARD_SIZE}
-                    onChange={(event) => moveSelection({ height: Number(event.target.value) })}
-                    type="number"
-                    value={selection.height}
-                  />
-                </label>
-              </div>
+              <p className="text-sm text-amber-100/70">
+                Click board squares to toggle them on or off. Upload one connected artwork
+                for the selected shape; each purchased square shows its part of that artwork.
+              </p>
+              {!isContiguous && (
+                <p className="mt-2 rounded-xl border border-red-300/30 bg-red-500/10 p-2 text-xs text-red-100">
+                  These squares are not connected. You can still price them, but connected
+                  artwork works best when every selected square touches another selected square.
+                </p>
+              )}
             </div>
 
             <div className="space-y-4">
-              <CreativeBuilder creative={creative} onChange={setCreative} selection={selection} />
-              <PurchasePanel creative={creative} quote={quote} selection={selection} />
+              <CreativeBuilder creative={creative} onChange={setCreative} selection={selectionBounds} />
+              <PurchasePanel
+                checkoutConfigured={checkoutConfigured}
+                creative={creative}
+                isContiguous={isContiguous}
+                quote={quote}
+                selectedSquares={selectedSquares}
+                selection={selectionBounds}
+              />
             </div>
           </aside>
         </div>

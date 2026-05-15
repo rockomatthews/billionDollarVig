@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { BOOST_HOURS, RESERVATION_TTL_MINUTES, TOTAL_UNITS } from "@/lib/board/constants";
-import { clampRect, getUnitCount } from "@/lib/board/geometry";
+import { clampRect, getSquaresUnitCount } from "@/lib/board/geometry";
 import { quoteUnits } from "@/lib/board/pricing";
 import { createNowPaymentsInvoice } from "@/lib/nowpayments";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
@@ -16,9 +16,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid checkout payload" }, { status: 400 });
   }
 
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    !process.env.NOWPAYMENTS_API_KEY ||
+    !process.env.NOWPAYMENTS_IPN_SECRET
+  ) {
     return NextResponse.json(
-      { error: "Supabase must be configured before live checkout can be used" },
+      { error: "Supabase and NOWPayments must be configured before live checkout can be used" },
       { status: 503 },
     );
   }
@@ -34,7 +39,7 @@ export async function POST(request: Request) {
     }
 
     const boardStats = stats as { sold_units?: number; reserved_units?: number } | null;
-    const unitCount = getUnitCount(selection);
+    const unitCount = getSquaresUnitCount(parsed.data.squares);
     const soldAndReservedUnits =
       Number(boardStats?.sold_units ?? 0) + Number(boardStats?.reserved_units ?? 0);
 
@@ -45,12 +50,9 @@ export async function POST(request: Request) {
     const quote = quoteUnits(soldAndReservedUnits, unitCount);
     const orderId = randomUUID();
 
-    const { data: reservation, error: reservationError } = await supabase.rpc("reserve_ad_block", {
+    const { data: reservation, error: reservationError } = await supabase.rpc("reserve_ad_blocks", {
       p_order_id: orderId,
-      p_x: selection.x,
-      p_y: selection.y,
-      p_width: selection.width,
-      p_height: selection.height,
+      p_squares: parsed.data.squares,
       p_buyer_label: parsed.data.creative.buyerLabel,
       p_target_url: parsed.data.creative.targetUrl,
       p_alt_text: parsed.data.creative.altText,

@@ -1,21 +1,27 @@
-import { DEMO_AD_BLOCKS } from "./constants";
 import type { AdBlock, BoardStats } from "./types";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
 export async function getBoardData(): Promise<{
   blocks: AdBlock[];
   stats: BoardStats;
+  checkoutConfigured: boolean;
 }> {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    const soldUnits = DEMO_AD_BLOCKS.reduce((sum, block) => sum + block.width * block.height, 0);
+  const checkoutConfigured = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      process.env.SUPABASE_SERVICE_ROLE_KEY &&
+      process.env.NOWPAYMENTS_API_KEY &&
+      process.env.NOWPAYMENTS_IPN_SECRET,
+  );
 
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return {
-      blocks: [...DEMO_AD_BLOCKS],
+      blocks: [],
       stats: {
-        soldUnits,
+        soldUnits: 0,
         reservedUnits: 0,
         totalRevenueCents: 0,
       },
+      checkoutConfigured,
     };
   }
 
@@ -25,7 +31,7 @@ export async function getBoardData(): Promise<{
       supabase
         .from("ad_blocks")
         .select(
-          "id,x,y,width,height,buyer_label,target_url,processed_image_url,boost_until,status,creative_background",
+          "id,order_id,x,y,width,height,buyer_label,target_url,processed_image_url,boost_until,status,creative_background",
         )
         .in("status", ["paid", "pending_moderation"])
         .order("acquired_at", { ascending: true }),
@@ -49,6 +55,7 @@ export async function getBoardData(): Promise<{
 
       return {
         id: block.id,
+        orderId: block.order_id,
         x: block.x,
         y: block.y,
         width: block.width,
@@ -74,5 +81,6 @@ export async function getBoardData(): Promise<{
       reservedUnits: Number(boardStats?.reserved_units ?? 0),
       totalRevenueCents: Number(boardStats?.total_revenue_cents ?? 0),
     },
+    checkoutConfigured,
   };
 }

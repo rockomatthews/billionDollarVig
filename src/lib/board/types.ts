@@ -1,5 +1,6 @@
 export type AdBlock = {
   id: string;
+  orderId: string;
   x: number;
   y: number;
   width: number;

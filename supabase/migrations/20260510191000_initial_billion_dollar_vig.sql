@@ -11,7 +11,7 @@ create table public.owners (
 create table public.ad_blocks (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid references public.owners(id) on delete set null,
-  order_id text not null unique,
+  order_id text not null,
   x integer not null check (x >= 0 and x < 1000),
   y integer not null check (y >= 0 and y < 1000),
   width integer not null check (width > 0 and width <= 1000),
@@ -42,7 +42,6 @@ create table public.ad_blocks (
 
 create table public.payments (
   id uuid primary key default gen_random_uuid(),
-  ad_block_id uuid not null references public.ad_blocks(id) on delete cascade,
   order_id text not null unique,
   amount_cents bigint not null check (amount_cents > 0),
   currency text not null default 'USD',
@@ -115,12 +114,9 @@ as $$
   from public.ad_blocks;
 $$;
 
-create or replace function public.reserve_ad_block(
+create or replace function public.reserve_ad_blocks(
   p_order_id text,
-  p_x integer,
-  p_y integer,
-  p_width integer,
-  p_height integer,
+  p_squares jsonb,
   p_buyer_label text,
   p_target_url text,
   p_alt_text text,
@@ -131,56 +127,61 @@ create or replace function public.reserve_ad_block(
   p_expires_minutes integer,
   p_boost_hours integer
 )
-returns uuid
+returns integer
 language plpgsql
 set search_path = public
 as $$
 declare
-  v_block_id uuid;
+  v_square jsonb;
+  v_reserved_count integer := 0;
 begin
   update public.ad_blocks
   set status = 'released', updated_at = now()
   where status = 'reserved' and reserved_until <= now();
 
-  insert into public.ad_blocks (
-    order_id,
-    x,
-    y,
-    width,
-    height,
-    buyer_label,
-    target_url,
-    alt_text,
-    original_upload_url,
-    processed_image_url,
-    crop_fit,
-    boost_hours,
-    reserved_until
-  )
-  values (
-    p_order_id,
-    p_x,
-    p_y,
-    p_width,
-    p_height,
-    p_buyer_label,
-    p_target_url,
-    p_alt_text,
-    p_original_upload_url,
-    p_processed_image_url,
-    p_crop_fit,
-    p_boost_hours,
-    now() + make_interval(mins => p_expires_minutes)
-  )
-  returning id into v_block_id;
+  for v_square in select value from jsonb_array_elements(p_squares)
+  loop
+    insert into public.ad_blocks (
+      order_id,
+      x,
+      y,
+      width,
+      height,
+      buyer_label,
+      target_url,
+      alt_text,
+      original_upload_url,
+      processed_image_url,
+      crop_fit,
+      boost_hours,
+      reserved_until
+    )
+    values (
+      p_order_id,
+      (v_square->>'x')::integer,
+      (v_square->>'y')::integer,
+      (v_square->>'size')::integer,
+      (v_square->>'size')::integer,
+      p_buyer_label,
+      p_target_url,
+      p_alt_text,
+      p_original_upload_url,
+      p_processed_image_url,
+      p_crop_fit,
+      p_boost_hours,
+      now() + make_interval(mins => p_expires_minutes)
+    );
 
-  insert into public.payments (ad_block_id, order_id, amount_cents)
-  values (v_block_id, p_order_id, p_amount_cents);
+    v_reserved_count := v_reserved_count + 1;
+  end loop;
 
-  return v_block_id;
+  insert into public.payments (order_id, amount_cents)
+  values (p_order_id, p_amount_cents);
+
+  return v_reserved_count;
 exception
   when exclusion_violation then
-    raise exception 'Selected plot overlaps an existing reservation or paid block';
+    raise exception 'One or more selected squares overlap an existing reservation or paid block';
 end;
 $$;
 
@@ -193,15 +194,14 @@ language plpgsql
 set search_path = public
 as $$
 declare
-  v_block_id uuid;
   v_payment_id uuid;
 begin
   update public.payments
   set status = p_status, updated_at = now()
   where order_id = p_order_id
-  returning ad_block_id, id into v_block_id, v_payment_id;
+  returning id into v_payment_id;
 
-  if v_block_id is null then
+  if v_payment_id is null then
     raise exception 'Payment order not found';
   end if;
 
@@ -212,11 +212,12 @@ begin
     acquired_at = coalesce(acquired_at, now()),
     boost_until = now() + make_interval(hours => boost_hours),
     updated_at = now()
-  where id = v_block_id;
+  where order_id = p_order_id;
 
   insert into public.ownership_events (ad_block_id, event_type, payment_id)
-  values (v_block_id, 'purchase', v_payment_id)
-  on conflict do nothing;
+  select id, 'purchase', v_payment_id
+  from public.ad_blocks
+  where order_id = p_order_id;
 end;
 $$;
 
@@ -243,12 +244,9 @@ insert into storage.buckets (id, name, public)
 values ('ad-creatives', 'ad-creatives', false)
 on conflict (id) do nothing;
 
-revoke execute on function public.reserve_ad_block(
+revoke execute on function public.reserve_ad_blocks(
   text,
-  integer,
-  integer,
-  integer,
-  integer,
+  jsonb,
   text,
   text,
   text,

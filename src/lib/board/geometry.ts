@@ -1,10 +1,16 @@
-import { BOARD_SIZE } from "./constants";
+import { BOARD_SIZE, SELECTABLE_SQUARE_SIZE } from "./constants";
 
 export type PlotRect = {
   x: number;
   y: number;
   width: number;
   height: number;
+};
+
+export type PurchaseSquare = {
+  x: number;
+  y: number;
+  size: number;
 };
 
 export function normalizeRect(rect: PlotRect): PlotRect {
@@ -76,4 +82,101 @@ export function getCreativeGuidance(rect: PlotRect) {
     fileTypes: "PNG, JPG, or WebP under 2 MB",
     suggestions,
   };
+}
+
+export function getSquareKey(square: PurchaseSquare) {
+  return `${square.x}:${square.y}:${square.size}`;
+}
+
+export function snapPointToSquare(x: number, y: number): PurchaseSquare {
+  const snappedX =
+    Math.floor(Math.max(0, Math.min(BOARD_SIZE - 1, x)) / SELECTABLE_SQUARE_SIZE) *
+    SELECTABLE_SQUARE_SIZE;
+  const snappedY =
+    Math.floor(Math.max(0, Math.min(BOARD_SIZE - 1, y)) / SELECTABLE_SQUARE_SIZE) *
+    SELECTABLE_SQUARE_SIZE;
+
+  return {
+    x: snappedX,
+    y: snappedY,
+    size: SELECTABLE_SQUARE_SIZE,
+  };
+}
+
+export function toggleSquare(squares: PurchaseSquare[], square: PurchaseSquare) {
+  const key = getSquareKey(square);
+
+  if (squares.some((item) => getSquareKey(item) === key)) {
+    return squares.filter((item) => getSquareKey(item) !== key);
+  }
+
+  return [...squares, square].sort((a, b) => a.y - b.y || a.x - b.x);
+}
+
+export function getSquaresUnitCount(squares: PurchaseSquare[]) {
+  return squares.reduce((sum, square) => sum + square.size * square.size, 0);
+}
+
+export function getSquaresBounds(squares: PurchaseSquare[]): PlotRect {
+  if (squares.length === 0) {
+    return {
+      x: 0,
+      y: 0,
+      width: SELECTABLE_SQUARE_SIZE,
+      height: SELECTABLE_SQUARE_SIZE,
+    };
+  }
+
+  const minX = Math.min(...squares.map((square) => square.x));
+  const minY = Math.min(...squares.map((square) => square.y));
+  const maxX = Math.max(...squares.map((square) => square.x + square.size));
+  const maxY = Math.max(...squares.map((square) => square.y + square.size));
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+}
+
+export function isContiguousSquareSelection(squares: PurchaseSquare[]) {
+  if (squares.length <= 1) {
+    return true;
+  }
+
+  const keys = new Set(squares.map(getSquareKey));
+  const queue = [squares[0]];
+  const seen = new Set<string>();
+
+  while (queue.length > 0) {
+    const square = queue.shift();
+
+    if (!square) {
+      continue;
+    }
+
+    const key = getSquareKey(square);
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+
+    const neighbors = [
+      { ...square, x: square.x - square.size },
+      { ...square, x: square.x + square.size },
+      { ...square, y: square.y - square.size },
+      { ...square, y: square.y + square.size },
+    ];
+
+    for (const neighbor of neighbors) {
+      if (keys.has(getSquareKey(neighbor)) && !seen.has(getSquareKey(neighbor))) {
+        queue.push(neighbor);
+      }
+    }
+  }
+
+  return seen.size === squares.length;
 }

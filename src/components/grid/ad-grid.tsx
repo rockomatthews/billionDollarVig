@@ -3,19 +3,25 @@
 import { Minus, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { BOARD_SIZE } from "@/lib/board/constants";
-import type { PlotRect } from "@/lib/board/geometry";
+import { getSquareKey, type PlotRect, type PurchaseSquare } from "@/lib/board/geometry";
 import type { AdBlock } from "@/lib/board/types";
 
 type AdGridProps = {
   blocks: AdBlock[];
-  selection: PlotRect;
+  selectionBounds: PlotRect;
+  selectedSquares: PurchaseSquare[];
   onSelectPoint: (x: number, y: number) => void;
   fullScreen?: boolean;
 };
 
-export function AdGrid({ blocks, selection, onSelectPoint, fullScreen = false }: AdGridProps) {
+export function AdGrid({
+  blocks,
+  selectionBounds,
+  selectedSquares,
+  onSelectPoint,
+  fullScreen = false,
+}: AdGridProps) {
   const [zoom, setZoom] = useState(1);
-  const [showLabels, setShowLabels] = useState(true);
 
   const boostedIds = useMemo(() => {
     return new Set(
@@ -23,6 +29,37 @@ export function AdGrid({ blocks, selection, onSelectPoint, fullScreen = false }:
         .filter((block) => block.boostUntil)
         .map((block) => block.id),
     );
+  }, [blocks]);
+  const orderBounds = useMemo(() => {
+    const bounds = new Map<string, PlotRect>();
+
+    for (const block of blocks) {
+      const current = bounds.get(block.orderId);
+
+      if (!current) {
+        bounds.set(block.orderId, {
+          x: block.x,
+          y: block.y,
+          width: block.width,
+          height: block.height,
+        });
+        continue;
+      }
+
+      const minX = Math.min(current.x, block.x);
+      const minY = Math.min(current.y, block.y);
+      const maxX = Math.max(current.x + current.width, block.x + block.width);
+      const maxY = Math.max(current.y + current.height, block.y + block.height);
+
+      bounds.set(block.orderId, {
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY,
+      });
+    }
+
+    return bounds;
   }, [blocks]);
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
@@ -36,7 +73,7 @@ export function AdGrid({ blocks, selection, onSelectPoint, fullScreen = false }:
     <div
       className={
         fullScreen
-          ? "relative h-full bg-[#f7e7b1] p-1 md:p-2"
+          ? "relative h-full bg-black p-1 md:p-2"
           : "pixel-panel rounded-3xl p-3 md:p-5"
       }
     >
@@ -91,24 +128,13 @@ export function AdGrid({ blocks, selection, onSelectPoint, fullScreen = false }:
           >
             <Plus size={16} />
           </button>
-          <button
-            className={
-              fullScreen
-                ? "border border-black bg-white px-2 py-1 text-xs font-bold text-black"
-                : "rounded-full border border-amber-200/30 px-3 py-2 text-sm text-amber-50"
-            }
-            onClick={() => setShowLabels((value) => !value)}
-            type="button"
-          >
-            Labels
-          </button>
         </div>
       </div>
 
       <div
         className={
           fullScreen
-            ? "relative flex h-full min-h-0 items-center justify-center overflow-auto bg-[#f7e7b1] touch-pan-x touch-pan-y"
+            ? "relative flex h-full min-h-0 items-center justify-center overflow-auto bg-black touch-pan-x touch-pan-y"
             : "relative overflow-auto rounded-2xl border border-amber-200/25 bg-black/70 p-2 touch-pan-x touch-pan-y"
         }
       >
@@ -131,6 +157,7 @@ export function AdGrid({ blocks, selection, onSelectPoint, fullScreen = false }:
         >
           {blocks.map((block) => {
             const boosted = boostedIds.has(block.id);
+            const groupBounds = orderBounds.get(block.orderId);
             return (
               <a
                 aria-label={block.buyerLabel}
@@ -151,28 +178,51 @@ export function AdGrid({ blocks, selection, onSelectPoint, fullScreen = false }:
               >
                 {block.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img alt={block.buyerLabel} className="h-full w-full object-cover" src={block.imageUrl} />
+                  <img
+                    alt={block.buyerLabel}
+                    className="absolute max-w-none"
+                    src={block.imageUrl}
+                    style={
+                      groupBounds
+                        ? {
+                            left: `-${((block.x - groupBounds.x) / block.width) * 100}%`,
+                            top: `-${((block.y - groupBounds.y) / block.height) * 100}%`,
+                            width: `${(groupBounds.width / block.width) * 100}%`,
+                            height: `${(groupBounds.height / block.height) * 100}%`,
+                          }
+                        : undefined
+                    }
+                  />
                 ) : (
-                  showLabels && <span className="px-1 text-[10px] leading-none">{block.buyerLabel}</span>
-                )}
-                {boosted && (
-                  <span className="absolute right-0 top-0 bg-green-300 px-1 font-mono text-[8px] text-black">
-                    BOOST
-                  </span>
+                  <span className="h-full w-full bg-[#111]" />
                 )}
               </a>
             );
           })}
 
-          <div
-            className="absolute z-30 border-2 border-dashed border-black bg-green-300/35 shadow-[0_0_30px_rgba(134,255,143,.8)]"
-            style={{
-              left: `${(selection.x / BOARD_SIZE) * 100}%`,
-              top: `${(selection.y / BOARD_SIZE) * 100}%`,
-              width: `${(selection.width / BOARD_SIZE) * 100}%`,
-              height: `${(selection.height / BOARD_SIZE) * 100}%`,
-            }}
-          />
+          {selectedSquares.map((square) => (
+            <div
+              className="absolute z-30 border border-black bg-green-300/45 shadow-[0_0_18px_rgba(134,255,143,.75)]"
+              key={getSquareKey(square)}
+              style={{
+                left: `${(square.x / BOARD_SIZE) * 100}%`,
+                top: `${(square.y / BOARD_SIZE) * 100}%`,
+                width: `${(square.size / BOARD_SIZE) * 100}%`,
+                height: `${(square.size / BOARD_SIZE) * 100}%`,
+              }}
+            />
+          ))}
+          {selectedSquares.length > 1 && (
+            <div
+              className="absolute z-40 border-2 border-dashed border-green-700"
+              style={{
+                left: `${(selectionBounds.x / BOARD_SIZE) * 100}%`,
+                top: `${(selectionBounds.y / BOARD_SIZE) * 100}%`,
+                width: `${(selectionBounds.width / BOARD_SIZE) * 100}%`,
+                height: `${(selectionBounds.height / BOARD_SIZE) * 100}%`,
+              }}
+            />
+          )}
         </div>
 
         <div
@@ -186,10 +236,10 @@ export function AdGrid({ blocks, selection, onSelectPoint, fullScreen = false }:
             <span
               className="absolute block bg-green-400"
               style={{
-                left: `${(selection.x / BOARD_SIZE) * 100}%`,
-                top: `${(selection.y / BOARD_SIZE) * 100}%`,
-                width: `${Math.max((selection.width / BOARD_SIZE) * 100, 3)}%`,
-                height: `${Math.max((selection.height / BOARD_SIZE) * 100, 3)}%`,
+                left: `${(selectionBounds.x / BOARD_SIZE) * 100}%`,
+                top: `${(selectionBounds.y / BOARD_SIZE) * 100}%`,
+                width: `${Math.max((selectionBounds.width / BOARD_SIZE) * 100, 3)}%`,
+                height: `${Math.max((selectionBounds.height / BOARD_SIZE) * 100, 3)}%`,
               }}
             />
           </div>
