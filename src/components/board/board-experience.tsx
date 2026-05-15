@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
+import Image from "next/image";
 import { AdGrid } from "@/components/grid/ad-grid";
 import { CreativeBuilder, type CreativeDraft } from "@/components/creative/creative-builder";
 import { PurchasePanel } from "@/components/checkout/purchase-panel";
@@ -9,6 +10,7 @@ import { BOARD_SIZE, TOTAL_UNITS } from "@/lib/board/constants";
 import { clampRect, getUnitCount, type PlotRect } from "@/lib/board/geometry";
 import { formatUsd, quoteUnits } from "@/lib/board/pricing";
 import type { AdBlock, BoardStats } from "@/lib/board/types";
+import logo from "../../../billionDollarVigLogo.png";
 
 type BoardExperienceProps = {
   blocks: AdBlock[];
@@ -61,26 +63,29 @@ export function BoardExperience({ blocks, stats }: BoardExperienceProps) {
 
   return (
     <section className="flex h-screen flex-col overflow-hidden bg-[#f7e7b1] text-black">
-      <header className="z-40 border-b-2 border-black bg-[#ffffcc] px-2 py-1 font-[Arial] shadow-[0_2px_0_#d8c06f] md:px-3">
+      <header className="z-40 border-b-2 border-[#d7a83f] bg-black px-2 py-1 font-[Arial] shadow-[0_2px_0_#4f360c] md:px-3">
         <div className="flex min-h-14 items-center gap-2">
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-              <h1 className="truncate text-lg font-black leading-none text-[#0033cc] underline decoration-[#0033cc] md:text-2xl">
-                billiondollarvig.com
-              </h1>
-              <span className="hidden text-xs font-bold text-red-700 sm:inline">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+              <Image
+                alt="Billion Dollar Vig"
+                className="h-8 w-auto object-contain md:h-11"
+                priority
+                src={logo}
+              />
+              <span className="hidden text-xs font-bold text-[#f5d37c] sm:inline">
                 Own a piece of the billion dollar crypto homepage
               </span>
             </div>
-            <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[10px] leading-tight text-[#333] md:text-xs">
+            <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[10px] leading-tight text-white/75 md:text-xs">
               <span>{stats.soldUnits.toLocaleString()} / {TOTAL_UNITS.toLocaleString()} sold</span>
               <span>{soldPercent}% filled</span>
               <span>Next 10x10: {formatUsd(nextTenByTenQuote.subtotalCents)}</span>
-              <span className="hidden sm:inline">Crypto checkout by NOWPayments</span>
+              <span className="hidden text-[#f5d37c] sm:inline">Crypto checkout by NOWPayments</span>
             </div>
           </div>
           <button
-            className="shrink-0 border-2 border-black bg-[#ffcc00] px-3 py-2 text-sm font-black uppercase text-black shadow-[2px_2px_0_#000] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none md:px-5"
+            className="shrink-0 border-2 border-[#f5d37c] bg-[#f0b83f] px-3 py-2 text-sm font-black uppercase text-black shadow-[2px_2px_0_#5a3b00] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none md:px-5"
             onClick={() => setBuyOpen(true)}
             type="button"
           >
