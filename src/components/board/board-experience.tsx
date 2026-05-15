@@ -4,9 +4,12 @@ import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import Image from "next/image";
 import { AdGrid } from "@/components/grid/ad-grid";
-import { CreativeBuilder, type CreativeDraft } from "@/components/creative/creative-builder";
+import {
+  CreativeBuilder,
+  type CellCreativeDraft,
+} from "@/components/creative/creative-builder";
 import { PurchasePanel } from "@/components/checkout/purchase-panel";
-import { SELECTABLE_SQUARE_SIZE, TOTAL_UNITS } from "@/lib/board/constants";
+import { TOTAL_UNITS } from "@/lib/board/constants";
 import {
   getSquaresBounds,
   getSquaresUnitCount,
@@ -24,27 +27,19 @@ type BoardExperienceProps = {
   checkoutConfigured: boolean;
 };
 
-const DEFAULT_SQUARE: PurchaseSquare = {
-  x: 120,
-  y: 160,
-  size: SELECTABLE_SQUARE_SIZE,
-};
-
 export function BoardExperience({ blocks, stats, checkoutConfigured }: BoardExperienceProps) {
   const [buyOpen, setBuyOpen] = useState(false);
-  const [selectedSquares, setSelectedSquares] = useState<PurchaseSquare[]>([DEFAULT_SQUARE]);
-  const [creative, setCreative] = useState<CreativeDraft>({
-    buyerLabel: "",
-    targetUrl: "",
-    altText: "",
-    imagePreviewUrl: null,
-    imageName: null,
-    imageStoragePath: null,
-    fit: "cover",
-  });
+  const [selectedSquares, setSelectedSquares] = useState<PurchaseSquare[]>([]);
+  const [cellCreatives, setCellCreatives] = useState<Record<string, CellCreativeDraft>>({});
+  const [buyerLabel, setBuyerLabel] = useState("");
 
   const quote = useMemo(
-    () => quoteUnits(stats.soldUnits + stats.reservedUnits, getSquaresUnitCount(selectedSquares)),
+    () => {
+      const unitCount = getSquaresUnitCount(selectedSquares);
+      return unitCount > 0
+        ? quoteUnits(stats.soldUnits + stats.reservedUnits, unitCount)
+        : null;
+    },
     [selectedSquares, stats.reservedUnits, stats.soldUnits],
   );
   const nextTenByTenQuote = useMemo(
@@ -57,8 +52,7 @@ export function BoardExperience({ blocks, stats, checkoutConfigured }: BoardExpe
   function centerSelectionFromPoint(x: number, y: number) {
     const square = snapPointToSquare(x, y);
     setSelectedSquares((current) => {
-      const next = toggleSquare(current, square);
-      return next.length === 0 ? [square] : next;
+      return toggleSquare(current, square);
     });
   }
 
@@ -137,11 +131,11 @@ export function BoardExperience({ blocks, stats, checkoutConfigured }: BoardExpe
                   Selected cells
                 </span>
                 <span className="rounded-full border border-[#d7a83f]/50 bg-[#d7a83f]/15 px-3 py-1 text-sm text-[#fff1b8]">
-                  {selectedSquares.length} selected
+                  {selectedSquares.length || "None"} selected
                 </span>
                 <button
                   className="rounded-full border border-[#d7a83f]/40 px-3 py-1 text-sm text-[#f8edc7] transition hover:border-[#f5d37c] hover:bg-[#d7a83f]/10"
-                  onClick={() => setSelectedSquares([DEFAULT_SQUARE])}
+                  onClick={() => setSelectedSquares([])}
                   type="button"
                 >
                   Reset
@@ -149,20 +143,22 @@ export function BoardExperience({ blocks, stats, checkoutConfigured }: BoardExpe
               </div>
               <p className="text-sm text-[#f8edc7]/70">
                 Click individual 10x10 cells on the board to toggle exact coordinates.
-                Your selected cells can form any shape; empty holes remain empty.
+                Buy as many as you want now. Each cell gets its own square image and URL,
+                and you can upload or update them later.
               </p>
             </div>
 
             <div className="space-y-4">
               <CreativeBuilder
-                creative={creative}
-                onChange={setCreative}
+                cellCreatives={cellCreatives}
+                onCellCreativesChange={setCellCreatives}
                 selectedSquares={selectedSquares}
-                selection={selectionBounds}
               />
               <PurchasePanel
+                buyerLabel={buyerLabel}
                 checkoutConfigured={checkoutConfigured}
-                creative={creative}
+                cellCreatives={cellCreatives}
+                onBuyerLabelChange={setBuyerLabel}
                 quote={quote}
                 selectedSquares={selectedSquares}
               />

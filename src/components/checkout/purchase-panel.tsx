@@ -2,21 +2,25 @@
 
 import { useState } from "react";
 import { ArrowUpRight, Coins } from "lucide-react";
-import type { CreativeDraft } from "@/components/creative/creative-builder";
-import { getSquaresUnitCount, type PurchaseSquare } from "@/lib/board/geometry";
+import type { CellCreativeDraft } from "@/components/creative/creative-builder";
+import { getSquareKey, getSquaresUnitCount, type PurchaseSquare } from "@/lib/board/geometry";
 import { formatUsd, type PriceQuote } from "@/lib/board/pricing";
 
 type PurchasePanelProps = {
   selectedSquares: PurchaseSquare[];
-  quote: PriceQuote;
-  creative: CreativeDraft;
+  quote: PriceQuote | null;
+  buyerLabel: string;
+  cellCreatives: Record<string, CellCreativeDraft>;
+  onBuyerLabelChange: (buyerLabel: string) => void;
   checkoutConfigured: boolean;
 };
 
 export function PurchasePanel({
   selectedSquares,
   quote,
-  creative,
+  buyerLabel,
+  cellCreatives,
+  onBuyerLabelChange,
   checkoutConfigured,
 }: PurchasePanelProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,13 +37,18 @@ export function PurchasePanel({
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          squares: selectedSquares,
+          squares: selectedSquares.map((square) => {
+            const cell = cellCreatives[getSquareKey(square)];
+
+            return {
+              ...square,
+              targetUrl: cell?.targetUrl || undefined,
+              altText: cell?.altText || undefined,
+              imageStoragePath: cell?.imageStoragePath || undefined,
+            };
+          }),
           creative: {
-            buyerLabel: creative.buyerLabel,
-            targetUrl: creative.targetUrl,
-            altText: creative.altText,
-            fit: creative.fit,
-            imageStoragePath: creative.imageStoragePath,
+            buyerLabel,
           },
         }),
       });
@@ -61,8 +70,7 @@ export function PurchasePanel({
     }
   }
 
-  const creativeReady = Boolean(creative.buyerLabel && creative.targetUrl);
-  const canCheckout = checkoutConfigured && creativeReady && selectedSquares.length > 0;
+  const canCheckout = checkoutConfigured && selectedSquares.length > 0;
 
   return (
     <div className="rounded-3xl border border-[#d7a83f]/45 bg-[#050505] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
@@ -75,7 +83,7 @@ export function PurchasePanel({
             Crypto checkout
           </p>
           <h3 className="text-2xl font-black text-[#fff7dc]">
-            {formatUsd(quote.subtotalCents)}
+            {quote ? formatUsd(quote.subtotalCents) : "$0"}
           </h3>
         </div>
       </div>
@@ -88,7 +96,7 @@ export function PurchasePanel({
         <div className="rounded-2xl border border-[#d7a83f]/25 bg-[#0b0905] p-3">
           <dt className="text-[#f8edc7]/55">Avg/unit</dt>
           <dd className="font-mono text-lg text-[#fff7dc]">
-            {formatUsd(quote.averageUnitPriceCents)}
+            {quote ? formatUsd(quote.averageUnitPriceCents) : "$0"}
           </dd>
         </div>
         <div className="rounded-2xl border border-[#d7a83f]/25 bg-[#0b0905] p-3">
@@ -111,9 +119,19 @@ export function PurchasePanel({
 
       <p className="mb-4 text-sm text-[#f8edc7]/70">
         NOWPayments will let buyers choose from hundreds of supported crypto assets.
-        Each selected 10x10 cell is reserved by coordinate while payment is pending,
-        then your uploaded artwork is clipped into those exact cells.
+        You are buying the selected cells now. Each cell can have its own image
+        and URL, either before purchase or updated later.
       </p>
+
+      <label className="mb-4 block text-sm text-[#f8edc7]/75">
+        Buyer or brand label, optional
+        <input
+          className="mt-1 w-full rounded-xl border border-[#d7a83f]/30 bg-[#090909] px-3 py-2 text-[#fff7dc] outline-none focus:border-[#f5d37c]"
+          onChange={(event) => onBuyerLabelChange(event.target.value)}
+          placeholder="Acme DAO"
+          value={buyerLabel}
+        />
+      </label>
 
       {!checkoutConfigured && (
         <p className="mb-4 rounded-2xl border border-[#d7a83f]/35 bg-[#d7a83f]/10 p-3 text-sm text-[#f8edc7]">
@@ -132,10 +150,9 @@ export function PurchasePanel({
         <ArrowUpRight size={18} />
       </button>
 
-      {!creativeReady && (
+      {selectedSquares.length === 0 && (
         <p className="mt-3 text-xs text-[#f8edc7]/65">
-          Add a buyer label and target URL before checkout. Artwork upload is previewed
-          locally in this MVP and finalized through storage once Supabase is configured.
+          Select one or more cells on the board first. Reset now clears all selected cells.
         </p>
       )}
       {message && <p className="mt-3 text-sm text-red-200">{message}</p>}

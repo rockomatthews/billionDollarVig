@@ -52,12 +52,7 @@ export async function POST(request: Request) {
     const { data: reservation, error: reservationError } = await supabase.rpc("reserve_ad_blocks", {
       p_order_id: orderId,
       p_squares: parsed.data.squares,
-      p_buyer_label: parsed.data.creative.buyerLabel,
-      p_target_url: parsed.data.creative.targetUrl,
-      p_alt_text: parsed.data.creative.altText,
-      p_crop_fit: parsed.data.creative.fit,
-      p_original_upload_url: parsed.data.creative.imageStoragePath ?? null,
-      p_processed_image_url: parsed.data.creative.imageStoragePath ?? null,
+      p_buyer_label: parsed.data.creative.buyerLabel || "Reserved cell",
       p_amount_cents: quote.subtotalCents,
       p_expires_minutes: RESERVATION_TTL_MINUTES,
       p_boost_hours: BOOST_HOURS,

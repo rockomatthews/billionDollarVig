@@ -1,52 +1,61 @@
 "use client";
 
 import { ImagePlus, Sparkles } from "lucide-react";
-import type { CSSProperties } from "react";
 import { useState } from "react";
-import {
-  getCreativeGuidance,
-  getSquareKey,
-  type PlotRect,
-  type PurchaseSquare,
-} from "@/lib/board/geometry";
+import { getSquareKey, type PurchaseSquare } from "@/lib/board/geometry";
 
-export type CreativeDraft = {
-  buyerLabel: string;
+export type CellCreativeDraft = {
   targetUrl: string;
   altText: string;
   imagePreviewUrl: string | null;
   imageName: string | null;
   imageStoragePath: string | null;
-  fit: "cover" | "contain";
 };
 
 type CreativeBuilderProps = {
-  selection: PlotRect;
   selectedSquares: PurchaseSquare[];
-  creative: CreativeDraft;
-  onChange: (creative: CreativeDraft) => void;
+  cellCreatives: Record<string, CellCreativeDraft>;
+  onCellCreativesChange: (cellCreatives: Record<string, CellCreativeDraft>) => void;
 };
 
 export function CreativeBuilder({
-  selection,
   selectedSquares,
-  creative,
-  onChange,
+  cellCreatives,
+  onCellCreativesChange,
 }: CreativeBuilderProps) {
-  const guidance = getCreativeGuidance(selection);
-  const [uploadState, setUploadState] = useState<"idle" | "uploading" | "uploaded" | "error">("idle");
+  const [uploadStates, setUploadStates] = useState<Record<string, "idle" | "uploading" | "uploaded" | "error">>({});
 
-  function update(next: Partial<CreativeDraft>) {
-    onChange({ ...creative, ...next });
+  function getCellCreative(square: PurchaseSquare): CellCreativeDraft {
+    return (
+      cellCreatives[getSquareKey(square)] ?? {
+        targetUrl: "",
+        altText: "",
+        imagePreviewUrl: null,
+        imageName: null,
+        imageStoragePath: null,
+      }
+    );
   }
 
-  async function handleFile(file: File | undefined) {
+  function updateCell(square: PurchaseSquare, next: Partial<CellCreativeDraft>) {
+    const key = getSquareKey(square);
+    onCellCreativesChange({
+      ...cellCreatives,
+      [key]: {
+        ...getCellCreative(square),
+        ...next,
+      },
+    });
+  }
+
+  async function handleFile(square: PurchaseSquare, file: File | undefined) {
     if (!file) {
       return;
     }
 
+    const key = getSquareKey(square);
     const previewUrl = URL.createObjectURL(file);
-    update({
+    updateCell(square, {
       imageName: file.name,
       imagePreviewUrl: previewUrl,
       imageStoragePath: null,
@@ -55,7 +64,7 @@ export function CreativeBuilder({
     const formData = new FormData();
     formData.append("file", file);
 
-    setUploadState("uploading");
+    setUploadStates((current) => ({ ...current, [key]: "uploading" }));
 
     try {
       const response = await fetch("/api/creative/upload", {
@@ -68,15 +77,14 @@ export function CreativeBuilder({
         throw new Error(payload.error ?? "Upload failed");
       }
 
-      onChange({
-        ...creative,
+      updateCell(square, {
         imageName: file.name,
         imagePreviewUrl: previewUrl,
         imageStoragePath: payload.path,
       });
-      setUploadState("uploaded");
+      setUploadStates((current) => ({ ...current, [key]: "uploaded" }));
     } catch {
-      setUploadState("error");
+      setUploadStates((current) => ({ ...current, [key]: "error" }));
     }
   }
 
@@ -87,147 +95,97 @@ export function CreativeBuilder({
           <p className="font-mono text-xs uppercase tracking-[0.25em] text-[#d7a83f]">
             Creative builder
           </p>
-          <h3 className="text-2xl font-black text-[#fff7dc]">
-            {selectedSquares.length} coordinate cell{selectedSquares.length === 1 ? "" : "s"}
-          </h3>
+          <h3 className="text-2xl font-black text-[#fff7dc]">Cell artwork</h3>
         </div>
         <Sparkles className="text-[#f5d37c]" />
       </div>
 
       <div className="mb-4 rounded-2xl border border-[#d7a83f]/35 bg-[#d7a83f]/10 p-3 text-sm text-[#f8edc7]">
-        <p className="font-bold text-[#f5d37c]">Suggested upload</p>
+        <p className="font-bold text-[#f5d37c]">Simple rule</p>
         <p>
-          Upload art for the whole coordinate set. It will be clipped into each
-          selected cell, so non-selected holes stay blank. Suggested canvas:{" "}
-          {guidance.minimumWidth} x {guidance.minimumHeight}px minimum, {guidance.fileTypes}.
+          If you buy {selectedSquares.length || 0} cell
+          {selectedSquares.length === 1 ? "" : "s"}, you can upload{" "}
+          {selectedSquares.length || 0} separate square image
+          {selectedSquares.length === 1 ? "" : "s"}. Each cell stands on its
+          own with its own image and URL. You can skip this now and update later.
         </p>
       </div>
 
-      <label className="group mb-4 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-[#d7a83f]/45 bg-[#100b02] p-5 text-center transition hover:border-[#f5d37c] hover:bg-[#d7a83f]/10">
-        <ImagePlus className="mb-2 text-[#f5d37c]" />
-        <span className="font-bold text-[#fff7dc]">
-          {creative.imageName ?? "Upload ad art"}
-        </span>
-        <span className="text-xs text-[#f8edc7]/60">
-          {uploadState === "uploading"
-            ? "Uploading to Supabase Storage..."
-            : uploadState === "uploaded"
-              ? "Uploaded and ready to attach to checkout."
-              : uploadState === "error"
-                ? "Preview saved locally. Configure Supabase to store uploads."
-                : "Preview before reserving. Final upload is stored with the checkout."}
-        </span>
-        <input
-          accept="image/png,image/jpeg,image/webp"
-          className="sr-only"
-          onChange={(event) => handleFile(event.target.files?.[0])}
-          type="file"
-        />
-      </label>
-
-      <div className="mb-4 overflow-hidden rounded-2xl border border-[#d7a83f]/35 bg-[#140e03] p-2">
-        <div
-          className="relative aspect-[var(--plot-aspect)] overflow-hidden rounded-lg border border-[#d7a83f]/50 bg-[#2b1c05] text-center text-[#f8edc7]"
-          style={{ "--plot-aspect": `${selection.width} / ${selection.height}` } as CSSProperties}
-        >
-          {!creative.imagePreviewUrl && (
-            <span className="absolute inset-0 flex items-center justify-center px-3 text-sm font-black uppercase">
-              Selected cells preview
-            </span>
-          )}
-          {selectedSquares.map((square) => (
-            <div
-              className="absolute overflow-hidden border border-black/50 bg-black/10"
-              key={getSquareKey(square)}
-              style={{
-                left: `${((square.x - selection.x) / selection.width) * 100}%`,
-                top: `${((square.y - selection.y) / selection.height) * 100}%`,
-                width: `${(square.size / selection.width) * 100}%`,
-                height: `${(square.size / selection.height) * 100}%`,
-              }}
-            >
-              {creative.imagePreviewUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  alt="Ad preview"
-                  className={`absolute max-w-none ${
-                    creative.fit === "cover" ? "object-cover" : "object-contain"
-                  }`}
-                  src={creative.imagePreviewUrl}
-                  style={{
-                    left: `-${((square.x - selection.x) / square.size) * 100}%`,
-                    top: `-${((square.y - selection.y) / square.size) * 100}%`,
-                    width: `${(selection.width / square.size) * 100}%`,
-                    height: `${(selection.height / square.size) * 100}%`,
-                  }}
-                />
-              ) : null}
-            </div>
-          ))}
+      {selectedSquares.length === 0 ? (
+        <div className="rounded-2xl border border-[#d7a83f]/30 bg-[#100b02] p-4 text-sm text-[#f8edc7]/70">
+          Select cells on the board first. Nothing is preselected.
         </div>
-      </div>
+      ) : (
+        <div className="space-y-3">
+          {selectedSquares.map((square, index) => {
+            const key = getSquareKey(square);
+            const cell = getCellCreative(square);
+            const uploadState = uploadStates[key] ?? "idle";
 
-      <div className="mb-4 flex gap-2">
-        {(["cover", "contain"] as const).map((fit) => (
-          <button
-            className={`flex-1 rounded-full border px-3 py-2 text-sm ${
-              creative.fit === fit
-                ? "border-[#f5d37c] bg-[#f0b83f] text-black"
-                : "border-[#d7a83f]/40 bg-[#0b0905] text-[#f8edc7]"
-            }`}
-            key={fit}
-            onClick={() => update({ fit })}
-            type="button"
-          >
-            {fit}
-          </button>
-        ))}
-      </div>
+            return (
+              <div
+                className="rounded-2xl border border-[#d7a83f]/30 bg-[#0b0905] p-3"
+                key={key}
+              >
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden border border-[#d7a83f]/50 bg-[#2b1c05] text-center text-[10px] font-bold text-[#f8edc7]">
+                    {cell.imagePreviewUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img alt="" className="h-full w-full object-cover" src={cell.imagePreviewUrl} />
+                    ) : (
+                      "10x10"
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-mono text-xs uppercase tracking-[0.18em] text-[#f5d37c]">
+                      Cell {index + 1}
+                    </p>
+                    <p className="font-mono text-sm text-[#fff7dc]">
+                      {square.x},{square.y}
+                    </p>
+                  </div>
+                  <label className="ml-auto cursor-pointer rounded-full border border-[#d7a83f]/45 px-3 py-1 text-xs text-[#f8edc7] transition hover:border-[#f5d37c] hover:bg-[#d7a83f]/10">
+                    <ImagePlus className="mr-1 inline h-3 w-3" />
+                    Image
+                    <input
+                      accept="image/png,image/jpeg,image/webp"
+                      className="sr-only"
+                      onChange={(event) => handleFile(square, event.target.files?.[0])}
+                      type="file"
+                    />
+                  </label>
+                </div>
 
-      <div className="space-y-3">
-        <label className="block text-sm text-[#f8edc7]/75">
-          Buyer or brand label
-          <input
-            className="mt-1 w-full rounded-xl border border-[#d7a83f]/30 bg-[#090909] px-3 py-2 text-[#fff7dc] outline-none focus:border-[#f5d37c]"
-            onChange={(event) => update({ buyerLabel: event.target.value })}
-            placeholder="Acme DAO"
-            value={creative.buyerLabel}
-          />
-        </label>
-        <label className="block text-sm text-[#f8edc7]/75">
-          Target URL
-          <input
-            className="mt-1 w-full rounded-xl border border-[#d7a83f]/30 bg-[#090909] px-3 py-2 text-[#fff7dc] outline-none focus:border-[#f5d37c]"
-            onChange={(event) => update({ targetUrl: event.target.value })}
-            placeholder="https://example.com"
-            type="url"
-            value={creative.targetUrl}
-          />
-        </label>
-        <label className="block text-sm text-[#f8edc7]/75">
-          Alt text
-          <textarea
-            className="mt-1 min-h-20 w-full rounded-xl border border-[#d7a83f]/30 bg-[#090909] px-3 py-2 text-[#fff7dc] outline-none focus:border-[#f5d37c]"
-            onChange={(event) => update({ altText: event.target.value })}
-            placeholder="Describe the artwork for accessibility and moderation."
-            value={creative.altText}
-          />
-        </label>
-      </div>
+                <input
+                  className="mb-2 w-full rounded-xl border border-[#d7a83f]/30 bg-[#090909] px-3 py-2 text-sm text-[#fff7dc] outline-none focus:border-[#f5d37c]"
+                  onChange={(event) => updateCell(square, { targetUrl: event.target.value })}
+                  placeholder="URL for this cell, optional for now"
+                  type="url"
+                  value={cell.targetUrl}
+                />
+                <input
+                  className="w-full rounded-xl border border-[#d7a83f]/30 bg-[#090909] px-3 py-2 text-sm text-[#fff7dc] outline-none focus:border-[#f5d37c]"
+                  onChange={(event) => updateCell(square, { altText: event.target.value })}
+                  placeholder="Alt text, optional"
+                  value={cell.altText}
+                />
 
-      <ul className="mt-4 space-y-2 text-xs text-[#f8edc7]/65">
-        {guidance.suggestions.map((suggestion) => (
-          <li key={suggestion}>- {suggestion}</li>
-        ))}
-        <li>
-          - Coordinates:{" "}
-          {selectedSquares
-            .slice(0, 12)
-            .map((square) => `${square.x},${square.y}`)
-            .join(" | ")}
-          {selectedSquares.length > 12 ? " | ..." : ""}
-        </li>
-      </ul>
+                <p className="mt-2 text-xs text-[#f8edc7]/55">
+                  {uploadState === "uploading"
+                    ? "Uploading..."
+                    : uploadState === "uploaded"
+                      ? "Uploaded."
+                      : uploadState === "error"
+                        ? "Preview saved locally. Configure Supabase to store uploads."
+                        : cell.imageName
+                          ? cell.imageName
+                          : "You can leave this blank and update it later."}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
