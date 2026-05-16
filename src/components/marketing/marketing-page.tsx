@@ -1,6 +1,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+const marketingLinks = [
+  { href: "/about", label: "About" },
+  { href: "/how-it-works", label: "How it works" },
+  { href: "/million-dollar-homepage-crypto", label: "MDH crypto" },
+  { href: "/advertise-with-crypto", label: "Advertise" },
+  { href: "/faq", label: "FAQ" },
+];
+
 type MarketingPageProps = {
   eyebrow: string;
   title: string;
@@ -17,9 +25,11 @@ export function MarketingPage({ eyebrow, title, description, children }: Marketi
             Billion Dollar Vig
           </Link>
           <div className="flex flex-wrap gap-4 text-sm text-[#f8edc7]/75">
-            <Link href="/how-it-works">How it works</Link>
-            <Link href="/advertise-with-crypto">Advertise</Link>
-            <Link href="/faq">FAQ</Link>
+            {marketingLinks.map((link) => (
+              <Link className="transition hover:text-[#f5d37c]" href={link.href} key={link.href}>
+                {link.label}
+              </Link>
+            ))}
           </div>
         </nav>
 

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { AdGrid } from "@/components/grid/ad-grid";
 import {
   CreativeBuilder,
@@ -20,6 +21,14 @@ import {
 import { formatUsd, quoteUnits } from "@/lib/board/pricing";
 import type { AdBlock, BoardStats } from "@/lib/board/types";
 import logo from "../../../billionDollarVigLogo.png";
+
+const headerLinks = [
+  { href: "/about", label: "About" },
+  { href: "/how-it-works", label: "How it works" },
+  { href: "/million-dollar-homepage-crypto", label: "MDH crypto" },
+  { href: "/advertise-with-crypto", label: "Advertise" },
+  { href: "/faq", label: "FAQ" },
+];
 
 type BoardExperienceProps = {
   blocks: AdBlock[];
@@ -61,16 +70,29 @@ export function BoardExperience({ blocks, stats, checkoutConfigured }: BoardExpe
       <header className="z-40 border-b-2 border-[#d7a83f] bg-black px-2 py-1 font-[Arial] shadow-[0_2px_0_#4f360c] md:px-3">
         <div className="flex min-h-14 items-center gap-2">
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-              <Image
-                alt="Billion Dollar Vig"
-                className="h-8 w-auto object-contain md:h-11"
-                priority
-                src={logo}
-              />
-              <span className="hidden text-xs font-bold text-[#f5d37c] sm:inline">
-                Own a piece of the billion dollar crypto homepage
-              </span>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Link href="/" aria-label="Billion Dollar Vig home">
+                <Image
+                  alt="Billion Dollar Vig"
+                  className="h-8 w-auto object-contain md:h-11"
+                  priority
+                  src={logo}
+                />
+              </Link>
+              <nav
+                aria-label="Site navigation"
+                className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-[#f8edc7]/75 md:text-xs"
+              >
+                {headerLinks.map((link) => (
+                  <Link
+                    className="transition hover:text-[#f5d37c]"
+                    href={link.href}
+                    key={link.href}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </nav>
             </div>
             <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[10px] leading-tight text-white/75 md:text-xs">
               <span>{stats.soldUnits.toLocaleString()} / {TOTAL_UNITS.toLocaleString()} sold</span>
