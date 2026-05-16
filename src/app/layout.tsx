@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { SEO_KEYWORDS, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/seo/site";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,22 +14,36 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://billiondollarvig.com",
-  ),
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "Billion Dollar Vig",
-    template: "%s | Billion Dollar Vig",
+    default: "Billion Dollar Vig | Buy Crypto Pixel Ads on the Billion Dollar Homepage",
+    template: `%s | ${SITE_NAME}`,
   },
-  description:
-    "A crypto-native, mobile-friendly homage to the Million Dollar Homepage where 1,000,000 ad units climb to a $1B sellout.",
+  description: SITE_DESCRIPTION,
+  keywords: SEO_KEYWORDS,
+  alternates: {
+    canonical: SITE_URL,
+  },
   openGraph: {
-    title: "Billion Dollar Vig",
-    description:
-      "Buy a piece of a billion-dollar internet billboard with crypto.",
-    url: "https://billiondollarvig.com",
-    siteName: "Billion Dollar Vig",
+    title: "Billion Dollar Vig | Crypto Pixel Ads",
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    siteName: SITE_NAME,
     type: "website",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "Billion Dollar Vig crypto pixel ad board",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Billion Dollar Vig | Crypto Pixel Ads",
+    description: SITE_DESCRIPTION,
+    images: ["/opengraph-image"],
   },
 };
 
